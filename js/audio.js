@@ -33,6 +33,8 @@
       this.htmlPoolIndexes = new Map();
       this.htmlUnlocked = false;
       this.htmlUnlockPromise = null;
+      this.htmlStartGestureAttempted = false;
+      this.htmlStartPrimed = false;
       this.webUnlockPromise = null;
       this.webUnlockPending = false;
       this.backend = "web";
@@ -67,19 +69,52 @@
 
     primeFromGesture(force = false) {
       if (!this.mobileMediaMode && !force) return false;
-      this.beginWebAudioUnlock();
-      if (this.htmlUnlocked || this.htmlUnlockPromise) return true;
+      this.playStartFromGesture();
+      if (window.AudioContext || window.webkitAudioContext) {
+        this.beginWebAudioUnlock();
+        return true;
+      }
+      return this.primeHtmlPoolsFromGesture();
+    }
 
+    playStartFromGesture() {
+      if (this.htmlStartGestureAttempted) return;
+      this.htmlStartGestureAttempted = true;
+      const media = this.htmlPools.get("start")?.[0];
+      if (!media) return;
+      try {
+        media.currentTime = 0;
+        media.muted = false;
+        media.volume = 0.2;
+        this.htmlStartPrimed = true;
+        const playback = media.play();
+        this.htmlUnlocked = true;
+        this.htmlUnlockPromise = Promise.resolve(true);
+        if (playback?.catch) {
+          playback.catch(() => {
+            this.htmlStartPrimed = false;
+            this.htmlUnlocked = false;
+            this.htmlUnlockPromise = null;
+            if (this.context?.state !== "running") this.backend = "web";
+          });
+        }
+      } catch {
+        this.htmlStartPrimed = false;
+        this.htmlUnlocked = false;
+        this.htmlUnlockPromise = null;
+      }
+    }
+
+    primeHtmlPoolsFromGesture() {
+      if (this.htmlUnlocked || this.htmlUnlockPromise) return true;
       const primeTasks = [];
       for (const pool of this.htmlPools.values()) {
         for (const media of pool) primeTasks.push(this.primeHtmlMedia(media));
       }
       if (!primeTasks.length) return false;
-
       const pending = Promise.all(primeTasks).then((results) => {
         this.htmlUnlocked = results.every(Boolean);
         if (this.htmlUnlocked) this.backend = "html";
-        else if (this.context?.state === "running") this.backend = "web";
         if (!this.htmlUnlocked && this.htmlUnlockPromise === pending) this.htmlUnlockPromise = null;
         return this.htmlUnlocked;
       });
@@ -137,8 +172,8 @@
       const htmlPromise = this.htmlUnlockPromise || Promise.resolve(this.htmlUnlocked);
       const webPromise = this.beginWebAudioUnlock();
       const [htmlReady, webReady] = await Promise.all([htmlPromise, webPromise]);
-      if (htmlReady) this.backend = "html";
-      else if (webReady) this.backend = "web";
+      if (webReady) this.backend = "web";
+      else if (htmlReady) this.backend = "html";
       return htmlReady || webReady;
     }
 
@@ -177,8 +212,13 @@
         silent.buffer = this.context.createBuffer(1, 1, this.context.sampleRate);
         silent.connect(this.context.destination);
         silent.start(0);
-        if (this.context.state !== "running") await this.context.resume();
-        await this.prepareFileBuffers();
+        if (this.context.state !== "running") {
+          await Promise.race([
+            this.context.resume().catch(() => false),
+            new Promise((resolve) => window.setTimeout(() => resolve(false), 600)),
+          ]);
+        }
+        this.prepareFileBuffers().catch(() => {});
       } catch {
         return false;
       }
@@ -260,11 +300,19 @@
 
     play(name, volume = 0.18) {
       if (!this.enabled) return;
+      if (name === "start" && this.htmlStartPrimed) {
+        this.htmlStartPrimed = false;
+        return;
+      }
+      if (this.backend === "web") {
+        this.fallbackToWebAudio(name, volume);
+        return;
+      }
       if (this.backend === "html" && this.htmlUnlocked) {
         this.playHtml(name, volume);
         return;
       }
-      this.playWebAudio(name, volume);
+      this.fallbackToWebAudio(name, volume);
     }
 
     playHtml(name, volume) {
