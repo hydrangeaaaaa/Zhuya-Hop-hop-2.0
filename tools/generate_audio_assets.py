@@ -133,8 +133,6 @@ def main() -> None:
         "break.wav": mix(sweep(150, 55, 0.16, 5.0), noise_burst(0.16, 59, 0.12, 0.36)),
         "death.wav": sweep(280, 75, 0.42, 2.3),
         "sword-start.wav": mix(sweep(450, 920, 0.24, 2.2), noise_burst(0.24, 71, 0.1, 0.30)),
-        "propeller-loop.wav": loop_texture("propeller", 2.0, 83),
-        "sword-loop.wav": loop_texture("sword", 2.0, 97),
     }
     for name, samples in cues.items():
         save(name, samples, LOOP_RATE if name.endswith("-loop.wav") else RATE)
@@ -142,3 +140,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
