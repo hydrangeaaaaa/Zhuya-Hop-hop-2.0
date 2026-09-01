@@ -107,6 +107,84 @@ document.addEventListener("DOMContentLoaded", async () => {
     "flight-loop-audio-removed",
     !audio.htmlTemplates.has("propellerLoop") && !audio.htmlTemplates.has("swordLoop"),
   );
+  const oneShotNames = [
+    "start", "jump", "spring", "pickup", "medal", "shield",
+    "shieldHit", "shot", "hit", "break", "death", "swordStart",
+  ];
+  check(
+    "one-shot-html-pools-precreated",
+    oneShotNames.every((name) => {
+      const pool = audio.htmlPools.get(name);
+      return pool?.length === 3 && new Set(pool).size === 3 && audio.htmlTemplates.get(name) === pool[0];
+    }),
+    oneShotNames.map((name) => `${name}:${audio.htmlPools.get(name)?.length || 0}`).join(","),
+  );
+
+  const poolPlayCounts = [0, 0, 0];
+  const poolProbe = poolPlayCounts.map((_, index) => ({
+    currentTime: 0,
+    muted: false,
+    volume: 1,
+    paused: true,
+    ended: false,
+    play() {
+      poolPlayCounts[index] += 1;
+      return Promise.resolve();
+    },
+  }));
+  audio.htmlPools.set("poolProbe", poolProbe);
+  audio.htmlPoolIndexes.set("poolProbe", 0);
+  for (let playIndex = 0; playIndex < 20; playIndex += 1) audio.playHtml("poolProbe", 0.12);
+  check(
+    "one-shot-pool-round-robin-overlap",
+    poolPlayCounts.reduce((sum, count) => sum + count, 0) === 20 &&
+      Math.max(...poolPlayCounts) - Math.min(...poolPlayCounts) <= 1,
+    poolPlayCounts.join(","),
+  );
+  audio.htmlPools.delete("poolProbe");
+  audio.htmlPoolIndexes.delete("poolProbe");
+
+  let fallbackCount = 0;
+  const originalFallbackToWebAudio = audio.fallbackToWebAudio;
+  audio.fallbackToWebAudio = () => { fallbackCount += 1; };
+  audio.htmlPools.set("rejectProbe", [{
+    currentTime: 0,
+    muted: false,
+    volume: 1,
+    paused: true,
+    ended: false,
+    play() { return Promise.reject(new Error("simulated mobile HTMLAudio rejection")); },
+  }]);
+  audio.htmlPoolIndexes.set("rejectProbe", 0);
+  audio.playHtml("rejectProbe", 0.12);
+  await new Promise((resolve) => window.setTimeout(resolve, 0));
+  check("html-rejection-routes-to-webaudio", fallbackCount === 1, String(fallbackCount));
+  audio.fallbackToWebAudio = originalFallbackToWebAudio;
+  audio.htmlPools.delete("rejectProbe");
+  audio.htmlPoolIndexes.delete("rejectProbe");
+
+  const poolsBeforeStop = audio.htmlPools;
+  const contextBeforeStop = audio.context;
+  const htmlUnlockedBeforeStop = audio.htmlUnlocked;
+  audio.stopAllLoops();
+  check(
+    "stop-loops-preserves-one-shot-backends",
+    audio.htmlPools === poolsBeforeStop && audio.context === contextBeforeStop &&
+      audio.htmlUnlocked === htmlUnlockedBeforeStop,
+  );
+
+  const originalAudioPlay = audio.play;
+  const flightAudioCalls = [];
+  audio.play = (name) => flightAudioCalls.push(name);
+  game.debugBeginFlight("sword");
+  game.debugBeginFlight("propeller", "cat");
+  check(
+    "sword-start-remains-single-one-shot",
+    flightAudioCalls.length === 1 && flightAudioCalls[0] === "swordStart" && audio.loops.size === 0,
+    flightAudioCalls.join(","),
+  );
+  audio.play = originalAudioPlay;
+  game.resetState();
 
   game.running = false;
 
