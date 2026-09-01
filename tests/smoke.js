@@ -92,16 +92,20 @@ document.addEventListener("DOMContentLoaded", async () => {
   check("shoot-button-present", Boolean(document.querySelector("#shoot-button")));
   check("mobile-audio-gesture-primer", typeof audio?.primeFromGesture === "function");
   const audioFiles = [
-    "jump.wav", "spring.wav", "pickup.wav", "medal.wav", "shield.wav", "shot.wav",
-    "propeller-loop.wav", "sword-loop.wav",
+    "start.wav", "jump.wav", "spring.wav", "pickup.wav", "medal.wav", "shield.wav",
+    "shield-hit.wav", "shot.wav", "hit.wav", "break.wav", "death.wav", "sword-start.wav",
   ];
   const audioResponses = await Promise.all(
     audioFiles.map((file) => fetch(`assets/audio/${file}`, { cache: "no-store" })),
   );
   check(
-    "mobile-audio-files-preloaded",
+    "remaining-audio-files-available",
     audioResponses.every((response) => response.ok),
     audioResponses.map((response) => response.status).join(","),
+  );
+  check(
+    "flight-loop-audio-removed",
+    !audio.htmlTemplates.has("propellerLoop") && !audio.htmlTemplates.has("swordLoop"),
   );
 
   game.running = false;
@@ -317,3 +321,4 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.title = failed.length ? `FAIL ${failed.length} - Zhuya Smoke` : "PASS - Zhuya Smoke";
   window.__ZHUYA_TEST_RESULTS = results;
 });
+
