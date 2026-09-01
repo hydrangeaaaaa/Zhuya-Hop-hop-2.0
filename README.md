@@ -54,4 +54,3 @@ python -m http.server 4173
 - `js/audio.js`：首次 START 手势解锁；猫狗使用轻巧旋翼空气脉冲，御剑使用柔和风声，无背景歌曲和低频嗡鸣。
 - `tools/prepare_assets.py`：确定性透明处理、弹簧/护盾小撇清理和平台调色。
 - `UPSTREAM.md`, `LICENSE`：上游来源和 MIT 授权。
-
