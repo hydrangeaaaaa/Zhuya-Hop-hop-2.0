@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no"
+    />
+    <meta name="theme-color" content="#f7edda" />
+    <title>逐亚 Hop Hop 2.0</title>
+    <link rel="stylesheet" href="style.css?v=9" />
+    <script defer src="js/config.js?v=9"></script>
+    <script defer src="js/audio.js?v=9"></script>
+    <script defer src="js/game.js?v=9"></script>
+    <script defer src="index.js?v=9"></script>
+    <script defer src="tests/smoke.js?v=9"></script>
+  </head>
+  <body>
+    <main id="app" class="app" aria-label="逐亚 Hop Hop">
+      <section id="start-view" class="screen-view is-active" aria-label="开始页面">
+        <div class="image-stage start-stage">
+          <img
+            src="assets/screens/start-screen.png"
+            alt="逐亚 Hop Hop 开始页面"
+            draggable="false"
+          />
+          <div id="character-preview" class="character-preview" aria-hidden="true">
+            <img id="character-preview-image" src="assets/character1/player-normal.png" alt="" />
+          </div>
+          <div class="character-picker" role="radiogroup" aria-label="选择人物">
+            <button class="character-option is-selected" type="button" data-character="character1" role="radio" aria-checked="true" aria-label="人物 1">
+              <span class="character-thumb"><img src="assets/character1/player-normal.png" alt="" /></span>
+              <span class="character-number">1</span>
+            </button>
+            <button class="character-option" type="button" data-character="character2" role="radio" aria-checked="false" aria-label="人物 2">
+              <span class="character-thumb"><img src="assets/character2/player-normal.png" alt="" /></span>
+              <span class="character-number">2</span>
+            </button>
+          </div>
+          <button id="start-button" class="image-hotspot start-hotspot" type="button">
+            <span class="sr-only">START</span>
+          </button>
+        </div>
+      </section>
+
+      <section id="game-view" class="game-view" aria-label="游戏画面">
+        <div id="game-stage" class="game-stage">
+          <canvas id="game-canvas" tabindex="0" aria-label="逐亚 Hop Hop 游戏区域"></canvas>
+          <div class="hud">
+            <div class="score-card">
+              <span>SCORE</span>
+              <strong id="score-value">0</strong>
+            </div>
+            <button id="music-button" class="music-button" type="button">MUSIC</button>
+          </div>
+          <div id="permission-note" class="permission-note" role="status"></div>
+          <button id="shoot-button" class="shoot-button" type="button" aria-label="发射子弹">
+            <span aria-hidden="true"></span>
+          </button>
+        </div>
+      </section>
+
+      <section id="game-over-view" class="screen-view" aria-label="游戏结束页面">
+        <div class="image-stage game-over-stage">
+          <img
+            src="assets/screens/game-over-screen.png"
+            alt="GAME OVER"
+            draggable="false"
+          />
+          <div id="final-score-top" class="final-score final-score-top">0</div>
+          <div id="final-score-main" class="final-score final-score-main">0</div>
+          <button id="restart-button" class="image-hotspot restart-hotspot" type="button">
+            <span class="sr-only">再来一次</span>
+          </button>
+          <button id="home-button" class="image-hotspot home-hotspot" type="button">
+            <span class="sr-only">返回主页</span>
+          </button>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>
