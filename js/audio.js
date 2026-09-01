@@ -17,8 +17,6 @@
     break: "assets/audio/break.wav",
     death: "assets/audio/death.wav",
     swordStart: "assets/audio/sword-start.wav",
-    propellerLoop: "assets/audio/propeller-loop.wav",
-    swordLoop: "assets/audio/sword-loop.wav",
   });
 
   class ZhuyaAudio {
@@ -149,35 +147,6 @@
       tone("death", 270, 0.38, 2.6, 72);
       tone("start", 460, 0.18, 3.2, 840);
       tone("swordStart", 430, 0.24, 2.4, 920);
-
-      const makeLoop = (name, kind, duration) => {
-        const sampleRate = this.context.sampleRate;
-        const buffer = this.context.createBuffer(1, Math.ceil(sampleRate * duration), sampleRate);
-        const data = buffer.getChannelData(0);
-        let randomState = kind === "propeller" ? 1729 : 4093;
-        let smooth = 0;
-        let slow = 0;
-        for (let index = 0; index < data.length; index += 1) {
-          const time = index / sampleRate;
-          randomState = (randomState * 1664525 + 1013904223) >>> 0;
-          const white = randomState / 0xffffffff - 0.5;
-          smooth += (white - smooth) * 0.12;
-          slow += (white - slow) * 0.018;
-          if (kind === "propeller") {
-            const pulse = 0.42 + 0.58 * Math.pow(Math.max(0, Math.sin(Math.PI * 2 * 8 * time)), 2);
-            data[index] = (
-              Math.sin(Math.PI * 2 * 280 * time) * 0.3 +
-              Math.sin(Math.PI * 2 * 360 * time) * 0.1 +
-              (smooth - slow) * 0.06
-            ) * pulse * 0.5;
-          } else {
-            data[index] = (smooth - slow) * 0.24;
-          }
-        }
-        this.buffers.set(`${name}Air`, buffer);
-      };
-      makeLoop("propeller", "propeller", 0.72);
-      makeLoop("sword", "sword", 1.2);
     }
 
     decodeAudioBuffer(arrayBuffer) {
@@ -345,3 +314,4 @@
 
   global.ZhuyaAudio = ZhuyaAudio;
 })(window);
+
