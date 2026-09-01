@@ -47,6 +47,8 @@
       this.handleGlobalGesture = () => this.resumeFromGesture();
       window.addEventListener("pointerdown", this.handleGlobalGesture, { capture: true, passive: true });
       window.addEventListener("touchstart", this.handleGlobalGesture, { capture: true, passive: true });
+      window.addEventListener("touchend", this.handleGlobalGesture, { capture: true, passive: true });
+      window.addEventListener("click", this.handleGlobalGesture, { capture: true, passive: true });
       window.addEventListener("keydown", this.handleGlobalGesture, { capture: true, passive: true });
     }
 
@@ -162,6 +164,18 @@
     resumeFromGesture() {
       if (!this.enabled || !this.mobileMediaMode) return;
       if (!this.htmlUnlocked && !this.htmlUnlockPromise) this.primeFromGesture();
+      if (this.context && this.context.state !== "running") {
+        try {
+          const resumed = this.context.resume();
+          Promise.resolve(resumed)
+            .then(() => {
+              if (this.context?.state === "running") this.backend = "web";
+            })
+            .catch(() => {});
+        } catch {
+          // A later ordinary gesture will retry the same AudioContext.
+        }
+      }
       if (!this.context || this.context.state !== "running") this.beginWebAudioUnlock();
     }
 
