@@ -10,7 +10,7 @@
 - 镜头渲染加入帧间插值，减少滚屏时的阶梯感。
 - 平台、怪物、奖章、子弹和特效增加屏外裁剪；高频数组清理由反复创建新数组改为原地压缩。
 - 猫/狗螺旋桨和御剑飞行不再播放持续循环音效，避免移动端循环音频造成不流畅；其余短音效保持不变。
-- 每种短音效预创建 3 个 HTML Audio 实例并循环复用；首次手势会静音预解锁全部实例，同时启动 Web Audio 兜底，避免飞行结束后要点射击才能恢复声音。
+- 手机端首次手势直接启动 Web Audio，并以其作为短音效主后端；真实 WAV 在后台解码，解码期间已有内置短音可立即播放。HTML Audio 池只作兼容备用，不再批量静音播放全部实例。
 
 完整验证数据见 [`PERFORMANCE-REPORT.md`](PERFORMANCE-REPORT.md)。
 
@@ -51,7 +51,7 @@ python -m http.server 4173
 - `index.html`, `style.css`, `index.js`：页面和生命周期。
 - `js/config.js`：集中配置、角色表和素材表。
 - `js/game.js`：物理、生成、状态、碰撞和 Canvas 渲染。
-- `js/audio.js`：短音效池、首次手势双后端解锁与失败兜底；飞行期间不播放循环声。
+- `js/audio.js`：手机端 Web Audio 生命周期、短音效池与失败兜底；飞行期间不播放循环声。
 - `tools/prepare_assets.py`：确定性透明处理、弹簧/护盾小撇清理和平台调色。
 - `UPSTREAM.md`, `LICENSE`：上游来源和 MIT 授权。
 
