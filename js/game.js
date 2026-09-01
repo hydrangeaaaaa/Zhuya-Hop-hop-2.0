@@ -1029,12 +1029,7 @@
       player.state = type === "sword" ? "swordRide" : "propellerFlight";
       player.stateElapsed = 0;
       player.flightStartVelocity = player.vy;
-      if (type === "sword") {
-        this.audio?.play("swordStart", 0.13);
-        this.audio?.startLoop("sword", 0.06);
-      } else {
-        this.audio?.startLoop("propeller", 0.095);
-      }
+      if (type === "sword") this.audio?.play("swordStart", 0.13);
     }
 
     updateFlight(delta) {
@@ -1057,7 +1052,6 @@
       }
       player.y += player.vy * delta;
       if (player.stateElapsed >= duration) {
-        this.audio?.stopLoop(isSword ? "sword" : "propeller");
         player.state = "normal";
         player.stateElapsed = 0;
         player.vy = 185;
@@ -1241,9 +1235,7 @@
     }
 
     restoreActiveLoop() {
-      if (!this.running || !this.audio?.enabled) return;
-      if (this.player.state === "propellerFlight") this.audio.startLoop("propeller", 0.095);
-      if (this.player.state === "swordRide") this.audio.startLoop("sword", 0.06);
+      // Flight loops are intentionally disabled; other one-shot effects stay unchanged.
     }
 
     worldToScreenY(worldY, camera = this.renderCameraY ?? this.cameraY) {
@@ -1725,3 +1717,4 @@
 
   global.ZhuyaGame = ZhuyaGame;
 })(window);
+
