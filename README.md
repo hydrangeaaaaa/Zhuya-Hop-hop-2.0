@@ -9,8 +9,8 @@
 - 大尺寸 PNG 在加载阶段预缩放到接近实际绘制尺寸；原始素材文件保持不变。
 - 镜头渲染加入帧间插值，减少滚屏时的阶梯感。
 - 平台、怪物、奖章、子弹和特效增加屏外裁剪；高频数组清理由反复创建新数组改为原地压缩。
-- 猫/狗螺旋桨和御剑飞行循环音效改为无缝、轻量的 44.1 kHz 单声道 WAV，支持短淡入淡出且同类循环不会重复叠加。
-- Web Audio 优先解码真实 WAV，失败时才使用程序生成的后备音效；HTML Audio 路径不再放大低音量请求。
+- 猫/狗螺旋桨和御剑飞行不再播放持续循环音效，避免移动端循环音频造成不流畅；其余短音效保持不变。
+- Web Audio 优先解码真实 WAV；HTML Audio 路径保持移动端兼容且不额外放大音量。
 
 完整验证数据见 [`PERFORMANCE-REPORT.md`](PERFORMANCE-REPORT.md)。
 
@@ -51,6 +51,7 @@ python -m http.server 4173
 - `index.html`, `style.css`, `index.js`：页面和生命周期。
 - `js/config.js`：集中配置、角色表和素材表。
 - `js/game.js`：物理、生成、状态、碰撞和 Canvas 渲染。
-- `js/audio.js`：首次 START 手势解锁；猫狗使用轻巧旋翼空气脉冲，御剑使用柔和风声，无背景歌曲和低频嗡鸣。
+- `js/audio.js`：首次 START 手势解锁；飞行期间不播放循环声，其余短音效保持独立播放。
 - `tools/prepare_assets.py`：确定性透明处理、弹簧/护盾小撇清理和平台调色。
 - `UPSTREAM.md`, `LICENSE`：上游来源和 MIT 授权。
+
