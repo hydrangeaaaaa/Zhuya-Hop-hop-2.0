@@ -3,6 +3,7 @@
   "use strict";
 
   const clampVolume = (volume) => Math.min(1, Math.max(0, volume));
+  const HTML_POOL_SIZE = 3;
 
   const HTML_FILES = Object.freeze({
     start: "assets/audio/start.wav",
@@ -28,9 +29,12 @@
       this.buffersPrepared = false;
       this.fileBuffersPromise = null;
       this.htmlTemplates = new Map();
+      this.htmlPools = new Map();
+      this.htmlPoolIndexes = new Map();
       this.htmlUnlocked = false;
       this.htmlUnlockPromise = null;
-      this.htmlStartPrimed = false;
+      this.webUnlockPromise = null;
+      this.webUnlockPending = false;
       this.backend = "web";
       const userAgent = window.navigator?.userAgent || "";
       const touchMac = /Macintosh/.test(userAgent) && (window.navigator?.maxTouchPoints || 0) > 1;
@@ -38,54 +42,123 @@
       const forceHtmlAudio = new URLSearchParams(window.location.search).has("html-audio");
       this.mobileMediaMode = forceHtmlAudio || /iPhone|iPad|iPod|Android|Mobile/i.test(userAgent) || touchMac || coarsePointer;
       this.prepareHtmlAudio();
+      this.handleGlobalGesture = () => this.resumeFromGesture();
+      window.addEventListener("pointerdown", this.handleGlobalGesture, { capture: true, passive: true });
+      window.addEventListener("touchstart", this.handleGlobalGesture, { capture: true, passive: true });
+      window.addEventListener("keydown", this.handleGlobalGesture, { capture: true, passive: true });
     }
 
     prepareHtmlAudio() {
       for (const [name, path] of Object.entries(HTML_FILES)) {
-        const media = new Audio(path);
-        media.preload = "auto";
-        media.setAttribute("playsinline", "");
-        media.setAttribute("webkit-playsinline", "");
-        media.load();
-        this.htmlTemplates.set(name, media);
+        const pool = [];
+        for (let index = 0; index < HTML_POOL_SIZE; index += 1) {
+          const media = new Audio(path);
+          media.preload = "auto";
+          media.setAttribute("playsinline", "");
+          media.setAttribute("webkit-playsinline", "");
+          media.load();
+          pool.push(media);
+        }
+        this.htmlTemplates.set(name, pool[0]);
+        this.htmlPools.set(name, pool);
+        this.htmlPoolIndexes.set(name, 0);
       }
     }
 
     primeFromGesture(force = false) {
-      if ((!this.mobileMediaMode && !force) || this.htmlUnlocked) return this.htmlUnlocked;
-      const media = this.htmlTemplates.get("start");
-      if (!media) return false;
-      this.backend = "html";
-      media.currentTime = 0;
-      media.muted = false;
-      media.volume = 0.2;
-      this.htmlStartPrimed = true;
-      try {
-        const result = media.play();
-        this.htmlUnlockPromise = Promise.resolve(result)
-          .then(() => {
-            this.htmlUnlocked = true;
-            return true;
-          })
-          .catch(() => {
-            this.backend = "web";
-            this.htmlStartPrimed = false;
-            return false;
-          });
-      } catch {
-        this.backend = "web";
-        this.htmlStartPrimed = false;
-        this.htmlUnlockPromise = Promise.resolve(false);
+      if (!this.mobileMediaMode && !force) return false;
+      this.beginWebAudioUnlock();
+      if (this.htmlUnlocked || this.htmlUnlockPromise) return true;
+
+      const primeTasks = [];
+      for (const pool of this.htmlPools.values()) {
+        for (const media of pool) primeTasks.push(this.primeHtmlMedia(media));
       }
+      if (!primeTasks.length) return false;
+
+      const pending = Promise.all(primeTasks).then((results) => {
+        this.htmlUnlocked = results.every(Boolean);
+        if (this.htmlUnlocked) this.backend = "html";
+        else if (this.context?.state === "running") this.backend = "web";
+        if (!this.htmlUnlocked && this.htmlUnlockPromise === pending) this.htmlUnlockPromise = null;
+        return this.htmlUnlocked;
+      });
+      this.htmlUnlockPromise = pending;
       return true;
     }
 
-    async unlock() {
-      if (this.mobileMediaMode) {
-        if (!this.htmlUnlockPromise) this.primeFromGesture();
-        if (await this.htmlUnlockPromise) return true;
+    primeHtmlMedia(media) {
+      try {
+        media.muted = true;
+        media.volume = 0;
+        media.currentTime = 0;
+        const playback = media.play();
+        let timeoutId = 0;
+        const accepted = Promise.resolve(playback).then(() => true, () => false);
+        const timeout = new Promise((resolve) => {
+          timeoutId = window.setTimeout(() => resolve(false), 800);
+        });
+        return Promise.race([accepted, timeout])
+          .then((ready) => {
+            window.clearTimeout(timeoutId);
+            try {
+              media.pause();
+              media.currentTime = 0;
+              media.muted = false;
+              media.volume = 1;
+            } catch {
+              return false;
+            }
+            return ready;
+          });
+      } catch {
+        try {
+          media.pause();
+          media.currentTime = 0;
+          media.muted = false;
+          media.volume = 1;
+        } catch {
+          // The WebAudio path remains available if this media element cannot be primed.
+        }
+        return Promise.resolve(false);
       }
-      return this.unlockWebAudio();
+    }
+
+    resumeFromGesture() {
+      if (!this.enabled || !this.mobileMediaMode) return;
+      if (!this.htmlUnlocked && !this.htmlUnlockPromise) this.primeFromGesture();
+      if (!this.context || this.context.state !== "running") this.beginWebAudioUnlock();
+    }
+
+    async unlock() {
+      if (this.mobileMediaMode && !this.htmlUnlocked) {
+        if (!this.htmlUnlockPromise) this.primeFromGesture();
+      }
+      const htmlPromise = this.htmlUnlockPromise || Promise.resolve(this.htmlUnlocked);
+      const webPromise = this.beginWebAudioUnlock();
+      const [htmlReady, webReady] = await Promise.all([htmlPromise, webPromise]);
+      if (htmlReady) this.backend = "html";
+      else if (webReady) this.backend = "web";
+      return htmlReady || webReady;
+    }
+
+    beginWebAudioUnlock() {
+      if (this.webUnlockPending) return this.webUnlockPromise;
+      if (this.webUnlockPromise && this.context?.state === "running") return this.webUnlockPromise;
+      this.webUnlockPending = true;
+      const pending = Promise.resolve(this.unlockWebAudio())
+        .then((ready) => {
+          if (!ready) this.webUnlockPromise = null;
+          return ready;
+        }, () => {
+          this.webUnlockPromise = null;
+          return false;
+        })
+        .finally(() => {
+          this.webUnlockPending = false;
+        });
+      this.webUnlockPromise = pending;
+      return pending;
     }
 
     async unlockWebAudio() {
@@ -188,10 +261,6 @@
     play(name, volume = 0.18) {
       if (!this.enabled) return;
       if (this.backend === "html" && this.htmlUnlocked) {
-        if (name === "start" && this.htmlStartPrimed) {
-          this.htmlStartPrimed = false;
-          return;
-        }
         this.playHtml(name, volume);
         return;
       }
@@ -199,25 +268,55 @@
     }
 
     playHtml(name, volume) {
-      const template = this.htmlTemplates.get(name);
-      if (!template) return;
-      const media = template.cloneNode(true);
-      media.volume = clampVolume(volume);
-      media.setAttribute("playsinline", "");
-      const playback = media.play();
-      if (playback?.catch) playback.catch(() => this.playWebAudio(name, volume));
+      const pool = this.htmlPools.get(name);
+      if (!pool?.length) {
+        this.fallbackToWebAudio(name, volume);
+        return;
+      }
+
+      const startIndex = this.htmlPoolIndexes.get(name) || 0;
+      let selectedIndex = startIndex;
+      for (let offset = 0; offset < pool.length; offset += 1) {
+        const candidateIndex = (startIndex + offset) % pool.length;
+        if (pool[candidateIndex].paused || pool[candidateIndex].ended) {
+          selectedIndex = candidateIndex;
+          break;
+        }
+      }
+      this.htmlPoolIndexes.set(name, (selectedIndex + 1) % pool.length);
+
+      const media = pool[selectedIndex];
+      try {
+        media.currentTime = 0;
+        media.muted = false;
+        media.volume = clampVolume(volume);
+        const playback = media.play();
+        if (playback?.catch) playback.catch(() => this.fallbackToWebAudio(name, volume));
+      } catch {
+        this.fallbackToWebAudio(name, volume);
+      }
+    }
+
+    fallbackToWebAudio(name, volume) {
+      if (this.playWebAudio(name, volume)) return;
+      Promise.resolve(this.beginWebAudioUnlock())
+        .then((ready) => {
+          if (ready) this.playWebAudio(name, volume);
+        })
+        .catch(() => {});
     }
 
     playWebAudio(name, volume) {
-      if (!this.context || this.context.state !== "running") return;
+      if (!this.context || this.context.state !== "running") return false;
       const buffer = this.buffers.get(name);
-      if (!buffer) return;
+      if (!buffer) return false;
       const source = this.context.createBufferSource();
       const gain = this.context.createGain();
       source.buffer = buffer;
-      gain.gain.value = volume;
+      gain.gain.value = clampVolume(volume);
       source.connect(gain).connect(this.context.destination);
       source.start();
+      return true;
     }
 
     startLoop(name, volume = 0.045) {
