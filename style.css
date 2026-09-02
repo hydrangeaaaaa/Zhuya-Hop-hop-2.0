@@ -104,7 +104,7 @@ button {
   z-index: 2;
   top: 36.4%;
   left: 50%;
-  display: grid;
+  display: none;
   width: 24%;
   height: 20%;
   place-items: center;
@@ -140,6 +140,7 @@ button {
 
 .character-picker::before {
   position: absolute;
+  display: none;
   z-index: 0;
   top: 3%;
   left: 50%;
@@ -404,3 +405,4 @@ button {
     box-shadow: none;
   }
 }
+
